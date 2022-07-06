@@ -1,0 +1,204 @@
+﻿@page "/customers"
+
+<Microsoft.AspNetCore.Components.Web.PageTitle>Customer</Microsoft.AspNetCore.Components.Web.PageTitle>
+
+<PageComponent Title="Customer List">
+    <Content>
+        <SfGrid DataSource="@Customers" @ref="Grid"
+            Toolbar="@(new object[] {"Add", "Edit", "Delete", "Update", "Cancel", new ToolbarItem() { Type = ItemType.Input, Template = LoadTitle, Align = ItemAlign.Right }})"
+            AllowFiltering="true"
+            AllowGrouping="true"
+            AllowSorting="true"
+            RowHeight="40"
+            AllowTextWrap="true"
+            ShowColumnChooser="true"
+            AllowReordering="true"
+            ShowColumnMenu="true"
+            ContextMenuItems="@_context"
+            EnablePersistence="true"
+            AllowPaging="true"
+        >
+            <GridPageSettings PageSize="20" PageCount="20" PageSizes="true"></GridPageSettings>
+            <GridEvents OnActionBegin="OnBegin" TValue="Customer"></GridEvents>
+            <GridGroupSettings ShowGroupedColumn="true"></GridGroupSettings>
+            <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.CheckBox"></GridFilterSettings>
+            <GridEditSettings AllowAdding="true" AllowDeleting="true" AllowEditing="true" Mode="EditMode.Dialog" Dialog="_dialogParams" ShowDeleteConfirmDialog="true">
+                <HeaderTemplate>
+                    @{
+                        var text = GetHeader((context as Customer));
+                        <span>
+                            <i class="fa fa-@Icon"></i> @text
+                        </span>
+                    }
+                </HeaderTemplate>
+                <Template>
+                    @{
+                        var mode = (context as Customer);
+                    }
+                    <div class="row">
+                        <GenericField>
+                            <Control>
+                                <SfTextBox @bind-Value="mode!.Name" CssClass="form-control" Placeholder="Name"/>
+                            </Control>
+                            <Validation>
+                                <ValidationMessage For="@(() => mode!.Name)"/>
+                            </Validation>
+                        </GenericField>
+
+                        <GenericField>
+                            <Control>
+                                <SfTextBox @bind-Value="mode!.Email" CssClass="form-control" Placeholder="Email"/>
+                            </Control>
+                            <Validation>
+                                <ValidationMessage For="@(() => mode!.Email)"/>
+                            </Validation>
+                        </GenericField>
+
+                        <GenericField>
+                            <Control>
+                                <SfTextBox @bind-Value="mode!.Phone" CssClass="form-control" Placeholder="Phone"/>
+                            </Control>
+                            <Validation>
+                                <ValidationMessage For="@(() => mode!.Phone)"/>
+                            </Validation>
+                        </GenericField>
+                    
+                    </div>
+                </Template>
+                <FooterTemplate>
+                    <SfButton OnClick="@Cancel"
+                              IconCss="fa fa-arrow-circle-left"
+                              CssClass="e-secondary e-outline"
+                              IconPosition="@IconPosition.Left">
+                        Cancel
+                    </SfButton>
+                    <SfButton OnClick="@Save"
+                              IconCss="fa fa-arrow-circle-right"
+                              CssClass="e-success e-outline"
+                              IsPrimary="true"
+                              IconPosition="@IconPosition.Right">
+                        @ButtonText
+                    </SfButton>
+                </FooterTemplate>
+            </GridEditSettings>
+            <GridColumns>
+                <GridColumn Field=@nameof(Customer.Id) IsIdentity="true" IsPrimaryKey="true" HeaderText="ID" ShowInColumnChooser="true" Visible="false"></GridColumn>
+                <GridColumn Field=@nameof(Customer.Name) HeaderText="Name" EditType="EditType.DefaultEdit"></GridColumn>
+                <GridColumn Field=@nameof(Customer.Email) HeaderText="Name" EditType="EditType.DefaultEdit"></GridColumn>
+                <GridColumn Field=@nameof(Customer.Phone) HeaderText="Description" EditType="EditType.DefaultEdit"></GridColumn>
+    
+                <GridColumn HeaderText="Actions" AllowFiltering="false" AllowSorting="false" Width="160">
+                    <GridCommandColumns>
+                        <GridCommandColumn Type=CommandButtonType.Edit
+                                           ButtonOption="@(new CommandButtonOptions() {CssClass = "e-primary e-outline", IconCss = "fa fa-edit", IconPosition = @IconPosition.Left})">
+                        </GridCommandColumn>
+    
+                        <GridCommandColumn Type=CommandButtonType.Delete
+                                           ButtonOption="@(new CommandButtonOptions() {CssClass = "e-danger e-outline", IconCss = "fa fa-trash", IconPosition = @IconPosition.Left})">
+                        </GridCommandColumn>
+                    </GridCommandColumns>
+                </GridColumn>
+            </GridColumns>
+        </SfGrid>
+    </Content>
+</PageComponent>
+
+@code{
+    public UserDetail User = new();
+    private ClaimsPrincipal _claimsPrincipal;
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+    private string? Icon { get; set; }
+    private string? ButtonText { get; set; }
+    private List<Customer>? Customers { get; set; }
+
+    private static readonly RenderFragment LoadTitle = @<SearchTextComponent TItem="Customer"></SearchTextComponent>;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        _claimsPrincipal = (await AuthenticationStateTask).User;
+        if (_claimsPrincipal.Identity is {IsAuthenticated: true })
+        {
+            User = await _loginServices.GetUserDetails();
+        }
+        await GetList();
+    }
+
+    private async Task GetList()
+    {
+        Customers = await _httpClient.GetFromJsonAsync<List<Customer>>("customers");
+        Customers = Customers?.Where(e => e.UserId == User.UserId).OrderBy(e => e.Name).ToList();
+    }
+
+    private async Task OnBegin(ActionEventArgs<Customer> args)
+    {
+        switch (args.RequestType)
+        {
+            case Syncfusion.Blazor.Grids.Action.Save:
+                {
+                    args.Cancel = true; // prevent default action.
+                    if (args.Data.Id == 0)
+                    {
+                        args.Data.UserId = User.UserId;
+                        await _httpClient.PostAsJsonAsync("customers", args.Data);
+                    }
+                    else
+                    {
+                        await _httpClient.PutAsJsonAsync($"customers/{args.Data.Id.ToString()}", args.Data);
+                    }
+
+                    await GetList();
+                    break;
+                }
+            case Syncfusion.Blazor.Grids.Action.Delete:
+                {
+                    await _httpClient.DeleteAsync($"customers/{args.Data.Id.ToString()}");
+                    await GetList();
+                    break;
+                }
+        }
+    }
+
+     private SfGrid<Customer> Grid { get; set; }
+    //Context menu items
+    private readonly List<object> _context = new List<object>()
+    {
+        "AutoFit", "AutoFitAll", "SortAscending", "SortDescending", "Edit", "Copy", "Delete", "Group", "Ungroup", "", "ExcelExport", "PdfExport", "CsvExport", "FirstPage", "PrevPage", "NextPage", "LastPage"
+    };
+
+    private readonly DialogSettings _dialogParams = new DialogSettings
+    {
+        Width = "450px",
+        AllowDragging = true,
+        EnableResize = true,
+        //Height = "550px"
+    };
+
+    private string GetHeader(Customer value)
+    {
+        if (value.Id == 0)
+        {
+            ButtonText = "Insert";
+            Icon = "paper-plane";
+            return "Add New Customer";
+        }
+        else
+        {
+            ButtonText = "Update";
+            Icon = "edit";
+            return "Edit " + value.Name;
+        }
+    }
+    
+    private async Task Cancel()
+    {
+        await Grid.CloseEditAsync(); //Cancel editing action
+    }
+
+    private async Task Save()
+    {
+        await Grid.EndEditAsync(); //Save the edited/added data to Grid
+    }
+}

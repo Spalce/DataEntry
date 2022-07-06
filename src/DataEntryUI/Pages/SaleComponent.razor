@@ -1,0 +1,276 @@
+﻿@page "/sales"
+@using System.Text
+<style>
+    .space {
+        margin-right: 15px;
+    }
+</style>
+
+<PageComponent Title="New Sales">
+    <Content>
+        <Card Styles="new[] {CardStyle.Outline}" HeaderBackgroundColor="Color.Success">
+            <Title>
+                <CardTitle>Sale Master Details</CardTitle>
+            </Title>
+            <Header><CardTools/></Header>
+            <Body>
+                <EditForm Model="SaleModel" OnValidSubmit="Complete">
+                    <DataAnnotationsValidator></DataAnnotationsValidator>
+                     <div class="row">
+                        <div class="col-md-4">
+                            <GenericField>
+                                <Label>
+                                    <label>Select Customer</label>
+                                </Label>
+                                <Control>
+                                    <SfComboBox TValue="int?" TItem="Customer" CssClass="form-control" DataSource="Customers" @bind-Value="SaleModel.CustomerId" Placeholder="Select a customer">
+                                        <ComboBoxFieldSettings Value="Id" Text="Name"></ComboBoxFieldSettings>
+                                    </SfComboBox>
+                                </Control>
+                                <Validation>
+                                    <ValidationMessage For="@(() => SaleModel.CustomerId)"/>
+                                </Validation>
+                            </GenericField>
+                        </div>
+                        <div class="col-md-4">
+                            <GenericField>
+                                <Label>
+                                    <label>Total Sale</label>
+                                </Label>
+                                <Control>
+                                    <SfNumericTextBox @bind-Value="SaleModel.TotalSale" Enabled="false" CssClass="form-control" Placeholder="Price"/>
+                                </Control>
+                                <Validation>
+                                    <ValidationMessage For="@(() => SaleModel.TotalSale)"/>
+                                </Validation>
+                            </GenericField>
+                        </div>
+                        <div class="col-md-4">
+                            <GenericField>
+                                <Label>
+                                    <label>Amount Paid</label>
+                                </Label>
+                                <Control>
+                                    <SfNumericTextBox @bind-Value="SaleModel.AmountPaid" CssClass="form-control" Placeholder="Amount Paid"/>
+                                </Control>
+                                <Validation>
+                                    <ValidationMessage For="@(() => SaleModel.AmountPaid)"/>
+                                </Validation>
+                            </GenericField>
+                        </div>
+                    </div>
+                    
+                    <SfButton
+                        IconCss="fa fa-arrow-circle-right"
+                        CssClass="e-success e-outline float-right"
+                        IsPrimary="true"
+                        IconPosition="@IconPosition.Right">
+                        Save
+                    </SfButton>
+                    <SfButton OnClick="ClearAll" Type="button"
+                              IconCss="fa fa-times"
+                              CssClass="e-danger space e-outline float-right"
+                              IconPosition="@IconPosition.Right">
+                        Clear
+                    </SfButton>
+                </EditForm>
+            </Body>
+        </Card>
+
+        <Card Styles="new[] {CardStyle.Outline}" HeaderBackgroundColor="Color.Fuchsia" ToolOptions="new CardToolOptions() {Collapsable = true, Maximizable = true}">
+            <Title>
+                <CardTitle>Sale Items</CardTitle>
+            </Title>
+            <Header><CardTools/></Header>
+            <Body>
+            <EditForm Model="ListModel" OnValidSubmit="Append">
+                <div class="row">
+                    <div class="col-md-6">
+                        <InputSelect @bind-Value="ListModel.ProductId" class="form-control">
+                            <option value="">Select a product</option>
+                            @foreach (var item in Products)
+                            {
+                                <option value="@item.Id">@item.Name</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-3">
+                        <InputNumber @bind-Value="ListModel.Quantity" class="form-control" TValue="int" DisplayName="Quantity"></InputNumber>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-primary" type="submit" @onclick="@OnBtnClick">Add</button>
+                    </div>
+                </div>
+            </EditForm>
+            
+            <table class="table table-striped">
+                <thead>
+                <tr>
+                    <th scope="col">Product Name</th>
+                    <th scope="col">Quantity</th>
+                    <th scope="col">Price</th>
+                    <th scope="col">Total</th>
+                    <th scope="col">Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                @{
+                    foreach (var item in SaleItemsList)
+                    {
+                            <tr>
+                                <td>@item.ProductName</td>
+                                <td>
+                                    <input type="number" @bind-value="@item.Quantity" />
+                                </td>
+                                <td>@item.UnitPrice</td>
+                                
+                                <td>
+                                    @{
+                                    var total = item.Quantity * item.UnitPrice;
+                                    item.LineTotal = total;
+                                    SaleModel.TotalSale = SaleItemsList.Sum(e => e.LineTotal);
+                                    }
+                                    @item.LineTotal
+                                </td>
+                                <td>
+                                    <button type="button" @onclick="@(() => Delete(item))"><i class="fa fa-trash"></i></button>
+                                </td>
+                            </tr>
+                    }
+                }
+                </tbody>
+            </table>
+            </Body>
+        </Card>
+        
+        
+    </Content>
+</PageComponent>
+
+@code {
+    public UserDetail User = new();
+    private ClaimsPrincipal _claimsPrincipal;
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+    
+    public Sale SaleModel = new();
+    public SaleList ListModel = new();
+    public List<SaleItem> SaleItems = new();
+    public List<Customer> Customers = new();
+    public List<Product> Products = new();
+    public List<SaleList> SaleItemsList = new();
+    
+    private bool IsVisible { get; set; }
+    private void OnBtnClick()
+    {
+        this.IsVisible = true;
+    }
+
+    private async void Append()
+    {
+        this.IsVisible = false;
+        var product = await GetProduct(ListModel.ProductId);
+        var item = new SaleList();
+        item.Id = Guid.NewGuid();
+        item.ProductId = this.ListModel.ProductId;
+        item.ProductName = product.Name;
+        item.Quantity = this.ListModel.Quantity;
+        item.UnitPrice = product.Price;
+        item.LineTotal = this.ListModel.Quantity * product.Price;
+        SaleItemsList.Add(item);
+        StateHasChanged();
+        ListModel = new();
+    }
+
+    private void Delete(SaleList item)
+    {
+        SaleItemsList.Remove(item);
+        StateHasChanged();
+    }
+    
+    private async Task<Product> GetProduct(int? id)
+    {
+        return await _httpClient.GetFromJsonAsync<Product>($"products/{id.ToString()}");
+    }
+
+    public class SaleList
+    {
+        public Guid? Id { get; set; }
+        public int? ProductId { get; set; }
+        public string? ProductName { get; set; }
+        public int Quantity { get; set; } = 1;
+        public decimal UnitPrice { get; set; }
+        public decimal LineTotal { get; set; }
+    }
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        await GetList();
+    }
+
+    private async Task GetList()
+    {
+        Products = await _httpClient.GetFromJsonAsync<List<Product>>("products");
+        if (Products != null) Products = Products.OrderBy(e => e.Name).ToList();
+        Customers = await _httpClient.GetFromJsonAsync<List<Customer>>("customers");
+        if (Customers != null) Customers = Customers.OrderBy(e => e.Name).ToList();
+    }
+
+    private void ClearAll()
+    {
+        SaleModel.AmountPaid = 0;
+        SaleModel.TotalSale = 0;
+        SaleItemsList.Clear();
+        StateHasChanged();
+    }
+
+    private async Task Complete()
+    {
+        _claimsPrincipal = (await AuthenticationStateTask).User;
+        if (_claimsPrincipal.Identity is {IsAuthenticated: true })
+        {
+            User = await _loginServices.GetUserDetails();
+        }
+        var rand = new Random();
+        SaleModel.InvoiceNumber = Convert.ToInt32($"{rand.Next(1000000, 9999999)}");
+        SaleModel.UserId = User.UserId;
+        var jsonData = JsonConvert.SerializeObject(SaleModel);
+        var content = new StringContent(jsonData, Encoding.UTF8, "application/json");
+        var response = await _httpClient.PostAsync("sales", content);
+        var readTask = await response.Content.ReadAsStringAsync();
+        var result = JsonConvert.DeserializeObject<Product>(readTask);
+        if (result == null)
+        {
+            await _js.InvokeVoidAsync("showToast", "Oops! Something went wrong", 5000, "danger");
+        }
+        else
+        {
+            foreach (var item in SaleItemsList)
+            {
+                SaleItems.Add(new SaleItem()
+                {
+                    Quantity = item.Quantity,
+                    UnitPrice = item.UnitPrice,
+                    ProductId = item.ProductId ?? 0,
+                    SaleId = result.Id,
+                    TotalPrice = item.LineTotal
+                });
+            }
+            
+            var jsonData2 = JsonConvert.SerializeObject(SaleItems);
+            var content2 = new StringContent(jsonData2, Encoding.UTF8, "application/json");
+            var response2 = await _httpClient.PostAsync("saleitems", content2);
+            if (response2.IsSuccessStatusCode)
+            {
+                ClearAll();
+                await _js.InvokeVoidAsync("showToast", "Sale is successful.", 5000, "success");
+            }
+            else
+            {
+                await _js.InvokeVoidAsync("showToast", "Oops! Something went wrong.", 5000, "danger");
+            }
+        }
+    }
+}

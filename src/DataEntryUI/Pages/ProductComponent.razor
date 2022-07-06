@@ -1,0 +1,221 @@
+﻿@page "/products"
+
+<Microsoft.AspNetCore.Components.Web.PageTitle>Products</Microsoft.AspNetCore.Components.Web.PageTitle>
+
+<PageComponent Title="Products List">
+    <Content>
+        <SfGrid DataSource="@Products" @ref="Grid"
+            Toolbar="@(new object[] {"Add", "Edit", "Delete", "Update", "Cancel", new ToolbarItem() { Type = ItemType.Input, Template = LoadTitle, Align = ItemAlign.Right }})"
+            AllowFiltering="true"
+            AllowGrouping="true"
+            AllowSorting="true"
+            RowHeight="40"
+            AllowTextWrap="true"
+            ShowColumnChooser="true"
+            AllowReordering="true"
+            ShowColumnMenu="true"
+            ContextMenuItems="@_context"
+            EnablePersistence="true"
+            AllowPaging="true"
+        >
+            <GridPageSettings PageSize="20" PageCount="20" PageSizes="true"></GridPageSettings>
+            <GridEvents OnActionBegin="OnBegin" TValue="Product"></GridEvents>
+            <GridGroupSettings ShowGroupedColumn="true"></GridGroupSettings>
+            <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.CheckBox"></GridFilterSettings>
+            <GridEditSettings AllowAdding="true" AllowDeleting="true" AllowEditing="true" Mode="EditMode.Dialog" Dialog="_dialogParams" ShowDeleteConfirmDialog="true">
+                <HeaderTemplate>
+                    @{
+                        var text = GetHeader((context as Product));
+                        <span>
+                            <i class="fa fa-@Icon"></i> @text
+                        </span>
+                    }
+                </HeaderTemplate>
+                <Template>
+                    @{
+                        var mode = (context as Product);
+                    }
+                    <div class="row">
+                        <GenericField>
+                            <Control>
+                                <SfTextBox @bind-Value="mode!.Name" CssClass="form-control" Placeholder="Name"/>
+                            </Control>
+                            <Validation>
+                                <ValidationMessage For="@(() => mode!.Name)"/>
+                            </Validation>
+                        </GenericField>
+
+                        <GenericField>
+                            <Label>
+                                <label>Price</label>
+                            </Label>
+                            <Control>
+                                <SfNumericTextBox @bind-Value="mode!.Price" CssClass="form-control" Placeholder="Price"/>
+                            </Control>
+                            <Validation>
+                                <ValidationMessage For="@(() => mode!.Price)"/>
+                            </Validation>
+                        </GenericField>
+                    
+                    <GenericField>
+                        <Control>
+                            <SfComboBox TValue="int?" @bind-Value="mode!.CategoryId" TItem="Category" CssClass="form-control" DataSource="@Categories" AllowFiltering="true" Placeholder="Select a category">
+                                <ComboBoxFieldSettings Text="Name" Value="Id"></ComboBoxFieldSettings>
+                            </SfComboBox>
+                        </Control>
+                        <Validation>
+                            <ValidationMessage For="@(() => mode!.CategoryId)"/>
+                        </Validation>
+                    </GenericField>
+
+                        <GenericField>
+                        <Control>
+                            <SfTextBox @bind-Value="mode!.Description" HtmlAttributes="@(new Dictionary<string, object>() {{"rows", "5"}})" Multiline="true" Placeholder="Description"/>
+                        </Control>
+                        <Validation>
+                            <ValidationMessage For="@(() => mode!.Description)"/>
+                        </Validation>
+                    </GenericField>
+                    </div>
+                </Template>
+                <FooterTemplate>
+                    <SfButton OnClick="@Cancel"
+                              IconCss="fa fa-arrow-circle-left"
+                              CssClass="e-secondary e-outline"
+                              IconPosition="@IconPosition.Left">
+                        Cancel
+                    </SfButton>
+                    <SfButton OnClick="@Save"
+                              IconCss="fa fa-arrow-circle-right"
+                              CssClass="e-success e-outline"
+                              IsPrimary="true"
+                              IconPosition="@IconPosition.Right">
+                        @ButtonText
+                    </SfButton>
+                </FooterTemplate>
+            </GridEditSettings>
+            <GridColumns>
+                <GridColumn Field=@nameof(Product.Id) IsIdentity="true" IsPrimaryKey="true" HeaderText="ID" ShowInColumnChooser="true" Visible="false"></GridColumn>
+                <GridColumn Field=@nameof(Product.Name) HeaderText="Name" EditType="EditType.DefaultEdit"></GridColumn>
+                <GridColumn Field=@nameof(Product.Price) HeaderText="Name" EditType="EditType.DefaultEdit"></GridColumn>
+                <GridColumn Field=@nameof(Product.Description) HeaderText="Description" EditType="EditType.DefaultEdit"></GridColumn>
+    
+                <GridColumn HeaderText="Actions" AllowFiltering="false" AllowSorting="false" Width="160">
+                    <GridCommandColumns>
+                        <GridCommandColumn Type=CommandButtonType.Edit
+                                           ButtonOption="@(new CommandButtonOptions() {CssClass = "e-primary e-outline", IconCss = "fa fa-edit", IconPosition = @IconPosition.Left})">
+                        </GridCommandColumn>
+    
+                        <GridCommandColumn Type=CommandButtonType.Delete
+                                           ButtonOption="@(new CommandButtonOptions() {CssClass = "e-danger e-outline", IconCss = "fa fa-trash", IconPosition = @IconPosition.Left})">
+                        </GridCommandColumn>
+                    </GridCommandColumns>
+                </GridColumn>
+            </GridColumns>
+        </SfGrid>
+    </Content>
+</PageComponent>
+
+@code{
+    public UserDetail User = new();
+    private ClaimsPrincipal _claimsPrincipal;
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+    
+    private string? Icon { get; set; }
+    private string? ButtonText { get; set; }
+    private List<Product>? Products { get; set; }
+    private List<Category>? Categories { get; set; }
+
+    private static readonly RenderFragment LoadTitle = @<SearchTextComponent TItem="Product"></SearchTextComponent>;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        _claimsPrincipal = (await AuthenticationStateTask).User;
+        if (_claimsPrincipal.Identity is {IsAuthenticated: true })
+        {
+            User = await _loginServices.GetUserDetails();
+        }
+        await GetList();
+    }
+
+    private async Task GetList()
+    {
+        Products = await _httpClient.GetFromJsonAsync<List<Product>>("products");
+        Products = Products?.Where(e => e.UserId == User.UserId).OrderBy(e => e.Name).ToList();
+        Categories = await _httpClient.GetFromJsonAsync<List<Category>>("categories");
+        Categories = Categories?.Where(e => e.UserId == User.UserId).OrderBy(e => e.Name).ToList();
+    }
+
+    private async Task OnBegin(ActionEventArgs<Product> args)
+    {
+        switch (args.RequestType)
+        {
+            case Syncfusion.Blazor.Grids.Action.Save:
+                {
+                    args.Cancel = true; // prevent default action.
+                    if (args.Data.Id == 0)
+                    {
+                        args.Data.UserId = User.UserId;
+                        await _httpClient.PostAsJsonAsync("products", args.Data);
+                    }
+                    else
+                    {
+                        await _httpClient.PutAsJsonAsync($"products/{args.Data.Id.ToString()}", args.Data);
+                    }
+
+                    await GetList();
+                    break;
+                }
+            case Syncfusion.Blazor.Grids.Action.Delete:
+                {
+                    await _httpClient.DeleteAsync($"products/{args.Data.Id.ToString()}");
+                    await GetList();
+                    break;
+                }
+        }
+    }
+
+     private SfGrid<Product> Grid { get; set; }
+    //Context menu items
+    private readonly List<object> _context = new List<object>()
+    {
+        "AutoFit", "AutoFitAll", "SortAscending", "SortDescending", "Edit", "Copy", "Delete", "Group", "Ungroup", "", "ExcelExport", "PdfExport", "CsvExport", "FirstPage", "PrevPage", "NextPage", "LastPage"
+    };
+
+    private readonly DialogSettings _dialogParams = new DialogSettings
+    {
+        Width = "450px",
+        AllowDragging = true,
+        EnableResize = true,
+        //Height = "550px"
+    };
+
+    private string GetHeader(Product value)
+    {
+        if (value.Id == 0)
+        {
+            ButtonText = "Insert";
+            Icon = "paper-plane";
+            return "Add New Product";
+        }
+        else
+        {
+            ButtonText = "Update";
+            Icon = "edit";
+            return "Edit " + value.Name;
+        }
+    }
+    
+    private async Task Cancel()
+    {
+        await Grid.CloseEditAsync(); //Cancel editing action
+    }
+
+    private async Task Save()
+    {
+        await Grid.EndEditAsync(); //Save the edited/added data to Grid
+    }
+}
