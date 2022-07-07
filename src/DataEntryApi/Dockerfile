@@ -8,7 +8,6 @@ EXPOSE 443
 FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
 WORKDIR /src
 COPY ["DataEntryApi/DataEntryApi.csproj", "DataEntryApi/"]
-RUN dotnet restore "DataEntryApi/DataEntryApi.csproj"
 COPY . .
 WORKDIR "/src/DataEntryApi"
 RUN dotnet build "DataEntryApi.csproj" -c Release -o /app/build
