@@ -1,4 +1,5 @@
 ﻿@page "/sales"
+@attribute [Authorize]
 @using System.Text
 <style>
     .space {
@@ -88,7 +89,7 @@
                     <div class="col-md-6">
                         <InputSelect @bind-Value="ListModel.ProductId" class="form-control">
                             <option value="">Select a product</option>
-                            @foreach (var item in Products)
+                            @foreach (var item in Products!)
                             {
                                 <option value="@item.Id">@item.Name</option>
                             }
@@ -207,15 +208,20 @@
     protected override async Task OnInitializedAsync()
     {
         await base.OnInitializedAsync();
+        _claimsPrincipal = (await AuthenticationStateTask).User;
+        if (_claimsPrincipal.Identity is {IsAuthenticated: true })
+        {
+            User = await _loginServices.GetUserDetails();
+        }
         await GetList();
     }
 
     private async Task GetList()
     {
         Products = await _httpClient.GetFromJsonAsync<List<Product>>("products");
-        if (Products != null) Products = Products.OrderBy(e => e.Name).ToList();
+        if (Products != null) Products = Products.Where(e => e.UserId == User.UserId).OrderBy(e => e.Name).ToList();
         Customers = await _httpClient.GetFromJsonAsync<List<Customer>>("customers");
-        if (Customers != null) Customers = Customers.OrderBy(e => e.Name).ToList();
+        if (Customers != null) Customers = Customers.Where(e => e.UserId == User.UserId).OrderBy(e => e.Name).ToList();
     }
 
     private void ClearAll()
@@ -228,11 +234,7 @@
 
     private async Task Complete()
     {
-        _claimsPrincipal = (await AuthenticationStateTask).User;
-        if (_claimsPrincipal.Identity is {IsAuthenticated: true })
-        {
-            User = await _loginServices.GetUserDetails();
-        }
+        
         var rand = new Random();
         SaleModel.InvoiceNumber = Convert.ToInt32($"{rand.Next(1000000, 9999999)}");
         SaleModel.UserId = User.UserId;

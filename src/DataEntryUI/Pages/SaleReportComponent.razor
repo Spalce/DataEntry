@@ -1,11 +1,157 @@
 ﻿@page "/sale-report"
+@attribute [Authorize]
 
-<PageComponent>
+<PageComponent Title="Sales Report">
     <Content>
+        <Card Styles="new[] {CardStyle.Outline}" HeaderBackgroundColor="Color.Success">
+            <Title>
+                <CardTitle>Sale Master Details</CardTitle>
+            </Title>
+            <Header><CardTools/></Header>
+            <Body>
+                     <div class="row">
+                        <div class="col-md-4">
+                            <SfDatePicker @bind-Value="StartDate" 
+                                          CssClass="form-control" 
+                                          Format="dd-MM-yyyy"
+                                          Placeholder="Start Date"/>
+                        </div>
+                        <div class="col-md-4">
+                            <SfDatePicker @bind-Value="EndDate" 
+                                          CssClass="form-control" 
+                                          Format="dd-MM-yyyy"
+                                          Placeholder="End Date"/>
+                        </div>
+                        <div class="col-md-4">
+                            <SfCheckBox @bind-Checked="IsDetail" Label="Detail" LabelPosition="LabelPosition.Before"></SfCheckBox>
+                        </div>
+                    </div>
+                    
+                    <SfButton
+                        IconCss="fa fa-arrow-circle-right"
+                        CssClass="e-success e-outline float-right"
+                        IsPrimary="true"
+                        IconPosition="@IconPosition.Right" @onclick="Get">
+                        Save
+                    </SfButton>
+            </Body>
+        </Card>
 
+        <Card Styles="new[] {CardStyle.Outline}" HeaderBackgroundColor="Color.Fuchsia" ToolOptions="new CardToolOptions() {Collapsable = true, Maximizable = true}">
+            <Title>
+                <CardTitle>Sale Items</CardTitle>
+            </Title>
+            <Header><CardTools/></Header>
+            <Body>
+            
+            <table class="table table-striped">
+                <thead>
+                <tr>
+                    <th scope="col">Product Name</th>
+                    <th scope="col">Unit High Price</th>
+                    <th scope="col">Unit Low Price</th>
+                    <th scope="col">Total Low Price</th>
+                    <th scope="col">Total High Price</th>
+                </tr>
+                </thead>
+                <tbody>
+                @{
+                    foreach (var item in Reports!)
+                    {
+                        <tr>
+                            <td>@item.Product</td>
+                            <td>@item.LoPrice</td>
+                            <td>@item.HiPrice</td>
+                            <td>@item.ToLoPrice</td>
+                            <td>@item.ToHiPrice</td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+            </Body>
+        </Card>
     </Content>
 </PageComponent>
 
 @code {
+    public UserDetail User = new();
+    private ClaimsPrincipal _claimsPrincipal;
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+    
+    public DateTime StartDate { get; set; } = DateTime.Today;
+    public DateTime EndDate { get; set; } = DateTime.Today;
+    public bool IsDetail { get; set; }
 
+    public List<Sale>? Sales = new();
+    public List<SaleItem>? SaleItems = new();
+    public List<Report>? Reports = new();
+
+    public class Report
+    {
+        public string? Product { get; set; }
+        public decimal HiPrice { get; set; }
+        public decimal ToHiPrice { get; set; }
+        public decimal LoPrice { get; set; }
+        public decimal ToLoPrice { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        _claimsPrincipal = (await AuthenticationStateTask).User;
+        if (_claimsPrincipal.Identity is {IsAuthenticated: true })
+        {
+            User = await _loginServices.GetUserDetails();
+        }
+        //await GetItems();
+    }
+
+    private async Task GetItems()
+    {
+        Sales = await _httpClient.GetFromJsonAsync<List<Sale>>("sales");
+        Sales = Sales?.Where(e => e.Date >= StartDate.Date && e.Date <= EndDate.Date && e.UserId == User.UserId).ToList();
+        if (Sales != null)
+            foreach (var item in Sales)
+            {
+                var items = await _httpClient.GetFromJsonAsync<List<SaleItem>>($"sales/{item.Id}/items");
+                if (items != null) SaleItems?.AddRange(items);
+            }
+    }
+
+    private async Task Get()
+    {
+        Reports?.Clear();
+        SaleItems?.Clear();
+        
+        await GetItems();
+        var groupData = SaleItems?.GroupBy(e => e.ProductId);
+        foreach (var group in groupData!)
+        {
+            var product = await GetProduct(group.Key);
+            Reports?.Add(new Report()
+            {
+                Product = product.Name,
+            });
+
+            foreach (var item in group)
+            {
+                Report model;
+                model = Reports?.FirstOrDefault(e => e.Product == product.Name)!;
+                model.HiPrice = group.Max(e => e.UnitPrice);
+                model.LoPrice = group.Min(e => e.UnitPrice);
+                model.ToHiPrice = group.Max(e => e.TotalPrice);
+                model.ToLoPrice = group.Min(e => e.TotalPrice);
+            }
+        }
+        
+        StateHasChanged();
+    }
+
+    private async Task<Product> GetProduct(int? id)
+    {
+        return await _httpClient.GetFromJsonAsync<Product>($"products/{id.ToString()}");
+    }
+    
 }

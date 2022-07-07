@@ -31,7 +31,7 @@ namespace DataEntry.Infrastructure.Repository
             var items = await db.SaleItems.ToListAsync();
             return items;
         }
-
+        
         public async Task<SaleItem> GetByIdAsync(int id)
         {
             var item = await db.SaleItems.FindAsync(id);

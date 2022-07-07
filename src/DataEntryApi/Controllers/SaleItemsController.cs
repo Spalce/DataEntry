@@ -44,7 +44,7 @@ namespace DataEntryApi.Controllers
 
             return Ok();
         }
-
+        
         [HttpGet("{id}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]

@@ -41,8 +41,33 @@ namespace DataEntryApi.Controllers
                 Console.WriteLine(e);
                 throw;
             }
+        }
 
-            return Ok();
+        [HttpGet("{id}/items")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+        public async Task<ActionResult<IEnumerable<SaleItem>>> GetItems(int id)
+        {
+            try
+            {
+                var response = await repository.GetAllItemsAsync(id).ConfigureAwait(false);
+                if (response == null)
+                {
+                    return NoContent();
+                }
+
+                return Ok(response);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                throw;
+            }
         }
 
         [HttpGet("{id}")]
