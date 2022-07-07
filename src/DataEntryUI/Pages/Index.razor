@@ -1,6 +1,19 @@
 ﻿@page "/"
 @attribute [Authorize]
 
-<Microsoft.AspNetCore.Components.Web.PageTitle>Index</Microsoft.AspNetCore.Components.Web.PageTitle>
-
-Home
+<PageComponent Title="Dashboard">
+    <Content>
+        <div class="text-center">
+            <h1>Data Entry System</h1>
+            <br />
+            <br />
+            <h3>Great, you are authenticated!</h3>
+            <br/>
+            <br/>
+            <p>
+                This is a data entry system. Feel free to use it. Please do not forget to sent me your comments
+                and suggestions. Email: <a href="mailto:spalce.world@gmail.com">spalce.world@gmail.com</a> 
+            </p>
+        </div>
+    </Content>
+</PageComponent>
